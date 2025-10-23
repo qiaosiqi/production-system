@@ -11,7 +11,7 @@ class BookFinderGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("📖 图书查找系统")
-        self.root.geometry("600x500")
+        self.root.geometry("600x800")
 
         # 改为复选框多选模式
         tk.Label(root, text="请选择图书特征（可多选）", font=("Arial", 12)).pack(pady=10)
@@ -61,10 +61,15 @@ class BookFinderGUI:
         self.text.pack(pady=10)
 
     def run_inference(self):
-        # 动态获取所有被勾选的特征
         features = [f for f, v in self.feature_vars.items() if v.get()]
-        result = infer_book(features)
-        self.text.insert(tk.END, result + "\n")
+        steps, result = infer_book(features)
+
+        self.text.delete("1.0", tk.END)  # 清空旧内容
+        self.text.insert(tk.END, "推理过程如下：\n\n")
+        for step in steps:
+            self.text.insert(tk.END, f"{step}\n")
+        self.text.insert(tk.END, "\n" + result + "\n")
+
         write_result_to_file(features, result)
 
     def manage_rules(self):
