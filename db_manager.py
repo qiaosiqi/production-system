@@ -1,59 +1,67 @@
-# 数据库初始化和操作类
+# 数据库管理模块
+# 负责系统的数据库初始化、连接和各种数据操作
 import sqlite3
 
 class DatabaseManager:
     def __init__(self, db_name='abdomen_pain.db'):
-        self.db_name = db_name
-        self.conn = None
-        self.cursor = None
-        self.init_db()
+        """初始化数据库管理器
+        
+        参数:
+            db_name: 数据库文件名，默认使用abdomen_pain.db
+        """
+        self.db_name = db_name  # 数据库文件名
+        self.conn = None  # 数据库连接对象
+        self.cursor = None  # 游标对象，用于执行SQL语句
+        self.init_db()  # 初始化数据库表和初始数据
     
     def connect(self):
+        """建立数据库连接"""
         self.conn = sqlite3.connect(self.db_name)
         self.cursor = self.conn.cursor()
     
     def disconnect(self):
+        """断开数据库连接"""
         if self.conn:
             self.conn.close()
             self.conn = None
             self.cursor = None
     
     def init_db(self):
-        """初始化数据库，创建症状和规则表"""
+        """初始化数据库，创建必要的表结构"""
         self.connect()
         
-        # 创建症状表
+        # 创建症状表：存储所有可能的症状信息
         self.cursor.execute('''
         CREATE TABLE IF NOT EXISTS symptoms (
-            id INTEGER PRIMARY KEY,
-            name TEXT NOT NULL UNIQUE,
-            description TEXT
+            id INTEGER PRIMARY KEY,  -- 症状ID
+            name TEXT NOT NULL UNIQUE,  -- 症状名称
+            description TEXT  -- 症状描述
         )
         ''')
         
-        # 创建规则表 (知识图谱形式，使用前提条件列表和结论)
+        # 创建规则表：存储诊断规则，采用知识图谱形式组织
         self.cursor.execute('''
         CREATE TABLE IF NOT EXISTS rules (
-            id INTEGER PRIMARY KEY,
-            premises TEXT NOT NULL,  -- 前提条件ID列表，用逗号分隔
-            conclusion TEXT NOT NULL,  -- 结论ID
+            id INTEGER PRIMARY KEY,  -- 规则ID
+            premises TEXT NOT NULL,  -- 前提条件（症状ID列表，逗号分隔）
+            conclusion TEXT NOT NULL,  -- 结论（诊断结果ID）
             description TEXT  -- 规则描述
         )
         ''')
         
-        # 创建诊断结果表
+        # 创建诊断结果表：存储所有可能的诊断结果
         self.cursor.execute('''
         CREATE TABLE IF NOT EXISTS diagnostics (
-            id INTEGER PRIMARY KEY,
-            name TEXT NOT NULL UNIQUE,
-            description TEXT
+            id INTEGER PRIMARY KEY,  -- 诊断结果ID
+            name TEXT NOT NULL UNIQUE,  -- 诊断结果名称
+            description TEXT  -- 诊断结果描述
         )
         ''')
         
         self.conn.commit()
         self.disconnect()
         
-        # 插入初始数据
+        # 插入初始数据（症状、规则和诊断结果）
         self.insert_initial_data()
     
     def insert_initial_data(self):
@@ -110,7 +118,7 @@ class DatabaseManager:
             except sqlite3.IntegrityError:
                 pass  # 忽略已存在的数据
         
-        # 插入规则数据 (知识图谱形式)
+        # 插入规则数据（采用知识图谱形式组织）
         rules_data = [
             ('1,6,8,9,16,17', '105', '上腹痛+持续性疼痛+恶心+呕吐+暴饮暴食史+饮酒史->胰腺炎'),
             ('1,7,8,9', '101', '上腹痛+阵发性疼痛+恶心+呕吐->胃炎'),
@@ -136,7 +144,11 @@ class DatabaseManager:
         self.disconnect()
     
     def get_all_symptoms(self):
-        """获取所有症状"""
+        """获取所有症状信息
+        
+        返回:
+            list: 包含(症状ID, 症状名称)的元组列表
+        """
         self.connect()
         self.cursor.execute('SELECT id, name FROM symptoms ORDER BY id')
         symptoms = self.cursor.fetchall()
@@ -144,7 +156,11 @@ class DatabaseManager:
         return symptoms
     
     def get_all_rules(self):
-        """获取所有规则"""
+        """获取所有规则信息
+        
+        返回:
+            list: 包含(规则ID, 前提条件, 结论, 规则描述)的元组列表
+        """
         self.connect()
         self.cursor.execute('SELECT id, premises, conclusion, description FROM rules ORDER BY id')
         rules = self.cursor.fetchall()
@@ -152,7 +168,11 @@ class DatabaseManager:
         return rules
     
     def get_all_diagnostics(self):
-        """获取所有诊断结果"""
+        """获取所有诊断结果信息
+        
+        返回:
+            list: 包含(诊断ID, 诊断名称)的元组列表
+        """
         self.connect()
         self.cursor.execute('SELECT id, name FROM diagnostics ORDER BY id')
         diagnostics = self.cursor.fetchall()
@@ -160,7 +180,16 @@ class DatabaseManager:
         return diagnostics
     
     def add_rule(self, premises, conclusion, description):
-        """添加新规则"""
+        """添加新规则
+        
+        参数:
+            premises: 前提条件（症状ID列表，逗号分隔）
+            conclusion: 结论（诊断结果ID）
+            description: 规则描述
+            
+        返回:
+            bool: 添加成功返回True，失败返回False
+        """
         self.connect()
         try:
             self.cursor.execute('INSERT INTO rules (premises, conclusion, description) VALUES (?, ?, ?)', 
@@ -174,7 +203,17 @@ class DatabaseManager:
             return False
     
     def update_rule(self, rule_id, premises, conclusion, description):
-        """更新规则"""
+        """更新现有规则
+        
+        参数:
+            rule_id: 要更新的规则ID
+            premises: 新的前提条件（症状ID列表，逗号分隔）
+            conclusion: 新的结论（诊断结果ID）
+            description: 新的规则描述
+            
+        返回:
+            bool: 更新成功返回True，失败返回False
+        """
         self.connect()
         try:
             self.cursor.execute('''
@@ -189,7 +228,14 @@ class DatabaseManager:
             return False
     
     def delete_rule(self, rule_id):
-        """删除规则"""
+        """删除规则
+        
+        参数:
+            rule_id: 要删除的规则ID
+            
+        返回:
+            bool: 删除成功返回True，失败返回False
+        """
         self.connect()
         try:
             self.cursor.execute('DELETE FROM rules WHERE id = ?', (rule_id,))
@@ -202,7 +248,14 @@ class DatabaseManager:
             return False
     
     def get_diagnostic_name(self, diagnostic_id):
-        """根据诊断ID获取诊断名称"""
+        """根据诊断ID获取诊断名称
+        
+        参数:
+            diagnostic_id: 诊断结果ID
+            
+        返回:
+            str: 诊断结果名称，如果未找到返回'未知诊断'
+        """
         self.connect()
         self.cursor.execute('SELECT name FROM diagnostics WHERE id = ?', (diagnostic_id,))
         result = self.cursor.fetchone()
@@ -210,7 +263,14 @@ class DatabaseManager:
         return result[0] if result else '未知诊断'
     
     def get_symptom_name(self, symptom_id):
-        """根据症状ID获取症状名称"""
+        """根据症状ID获取症状名称
+        
+        参数:
+            symptom_id: 症状ID
+            
+        返回:
+            str: 症状名称，如果未找到返回'未知症状'
+        """
         self.connect()
         self.cursor.execute('SELECT name FROM symptoms WHERE id = ?', (symptom_id,))
         result = self.cursor.fetchone()

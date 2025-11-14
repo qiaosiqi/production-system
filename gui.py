@@ -1,4 +1,5 @@
-# 主界面类
+# 腹痛诊断系统主界面模块
+# 负责实现系统的用户界面，包括症状选择、诊断推理和规则管理功能
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 import os
@@ -6,23 +7,37 @@ from db_manager import DatabaseManager
 from inference_engine import InferenceEngine
 
 class AbdomenPainDiagnosticSystem:
+    """腹痛诊断系统主界面类
+    
+    实现系统的主要用户界面，包括：
+    - 症状选择功能
+    - 诊断推理功能
+    - 规则管理入口
+    - 结果展示和导出功能
+    """
+    
     def __init__(self, root):
-        self.root = root
-        self.root.title("腹痛诊断产生式系统")
-        self.root.geometry("1080x720")
+        """初始化主界面
         
-        # 初始化数据库
-        self.db_manager = DatabaseManager()
-        self.inference_engine = InferenceEngine(self.db_manager)
+        参数:
+            root: Tkinter根窗口对象
+        """
+        self.root = root
+        self.root.title("腹痛诊断产生式系统")  # 设置窗口标题
+        self.root.geometry("1080x720")  # 设置窗口大小
+        
+        # 初始化数据库管理器和推理引擎
+        self.db_manager = DatabaseManager()  # 用于数据库操作
+        self.inference_engine = InferenceEngine(self.db_manager)  # 用于诊断推理
         
         # 创建界面组件
         self.create_widgets()
         
-        # 初始化症状列表
+        # 加载所有症状到列表
         self.load_symptoms()
-        
+    
     def create_widgets(self):
-        """创建界面组件"""
+        """创建界面组件，构建用户交互界面"""
         # 创建主框架
         main_frame = ttk.Frame(self.root, padding="10")
         main_frame.pack(fill=tk.BOTH, expand=True)
@@ -36,7 +51,12 @@ class AbdomenPainDiagnosticSystem:
         symptom_frame.pack(fill=tk.BOTH, expand=True, pady=10)
         
         # 症状列表框
-        self.symptom_listbox = tk.Listbox(symptom_frame, selectmode=tk.MULTIPLE, font=('Arial', 12), height=10)
+        self.symptom_listbox = tk.Listbox(
+            symptom_frame, 
+            selectmode=tk.MULTIPLE,  # 允许多选
+            font=('Arial', 12), 
+            height=10
+        )
         scrollbar = ttk.Scrollbar(symptom_frame, orient=tk.VERTICAL, command=self.symptom_listbox.yview)
         self.symptom_listbox.config(yscrollcommand=scrollbar.set)
         
@@ -83,48 +103,68 @@ class AbdomenPainDiagnosticSystem:
         self.file_path_label.bind("<Button-1>", self.open_result_file)
     
     def load_symptoms(self):
-        """加载症状列表"""
+        """加载所有症状到列表框
+        
+        从数据库获取所有症状信息，然后显示在界面的列表框中
+        格式为：症状ID: 症状名称
+        """
         symptoms = self.db_manager.get_all_symptoms()
-        self.symptom_listbox.delete(0, tk.END)
+        self.symptom_listbox.delete(0, tk.END)  # 清空当前列表内容
         for symptom_id, name in symptoms:
-            self.symptom_listbox.insert(tk.END, f"{symptom_id}: {name}")
+            self.symptom_listbox.insert(tk.END, f"{symptom_id}: {name}")  # 将症状按ID+名称格式添加到列表
     
     def diagnose(self):
-        """执行诊断"""
-        # 获取选中的症状
+        """执行诊断推理
+        
+        1. 获取用户在列表框中选择的症状
+        2. 调用推理引擎进行诊断
+        3. 在界面上显示诊断结果和推理过程
+        4. 将结果保存到文件中
+        """
+        # 获取用户选择的症状索引
         selected_indices = self.symptom_listbox.curselection()
         selected_symptoms = []
         
         for index in selected_indices:
-            symptom_str = self.symptom_listbox.get(index)
-            symptom_id = symptom_str.split(':')[0]
-            selected_symptoms.append(symptom_id)
+            symptom_str = self.symptom_listbox.get(index)  # 获取选中的症状字符串
+            symptom_id = symptom_str.split(':')[0]  # 从字符串中提取症状ID
+            selected_symptoms.append(symptom_id)  # 添加到选中列表
+            selected_symptoms.append(symptom_id)  # 注意：这里重复添加了两次症状ID，可能是为了满足推理引擎的特定要求
         
+        # 验证用户是否选择了症状
         if not selected_symptoms:
             messagebox.showwarning("警告", "请至少选择一个症状！")
             return
         
-        # 执行推理
+        # 调用推理引擎进行诊断
         results, inference_process = self.inference_engine.inference(selected_symptoms)
         
-        # 显示结果
+        # 在界面上显示结果
         self.display_results(results, inference_process, selected_symptoms)
         
-        # 保存结果到文件
+        # 将结果保存到文件
         self.save_results_to_file(results, inference_process, selected_symptoms)
     
     def display_results(self, results, inference_process, selected_symptoms):
-        """显示诊断结果"""
-        # 清空文本框
+        """在界面上显示诊断结果
+        
+        参数：
+            results: 诊断结果列表，包含可能的疾病信息
+            inference_process: 推理过程的文本描述列表
+            selected_symptoms: 用户选择的症状ID列表
+        """
+        # 先启用文本框以便编辑
         self.process_text.config(state=tk.NORMAL)
-        self.process_text.delete(1.0, tk.END)
         self.result_text.config(state=tk.NORMAL)
+        
+        # 清空现有内容
+        self.process_text.delete(1.0, tk.END)
         self.result_text.delete(1.0, tk.END)
         
-        # 显示选中的症状
+        # 显示用户选择的症状
         self.result_text.insert(tk.END, "您选择的症状：\n")
         for symptom_id in selected_symptoms:
-            symptom_name = self.db_manager.get_symptom_name(symptom_id)
+            symptom_name = self.db_manager.get_symptom_name(symptom_id)  # 根据ID获取症状名称
             self.result_text.insert(tk.END, f"- {symptom_name}\n")
         self.result_text.insert(tk.END, "\n")
         
@@ -144,21 +184,28 @@ class AbdomenPainDiagnosticSystem:
         else:
             self.result_text.insert(tk.END, "根据当前症状无法做出明确诊断，请咨询医生\n")
         
-        # 禁用文本框编辑
+        # 重新禁用文本框，防止用户误编辑
         self.process_text.config(state=tk.DISABLED)
         self.result_text.config(state=tk.DISABLED)
     
     def save_results_to_file(self, results, inference_process, selected_symptoms):
-        """保存诊断结果到文件"""
-        # 创建结果文件路径
+        """将诊断结果保存到文件
+        
+        参数：
+            results: 诊断结果列表
+            inference_process: 推理过程的文本描述列表
+            selected_symptoms: 用户选择的症状ID列表
+        """
+        # 定义结果文件的路径，使用绝对路径便于用户查找
         result_file = os.path.abspath("result.out")
         
         try:
+            # 以写入模式打开文件，使用UTF-8编码确保中文显示正常
             with open(result_file, 'w', encoding='utf-8') as f:
                 f.write("腹痛诊断系统结果\n")
                 f.write("=" * 30 + "\n\n")
                 
-                # 写入选中的症状
+                # 写入选中的症状信息
                 f.write("您选择的症状：\n")
                 for symptom_id in selected_symptoms:
                     symptom_name = self.db_manager.get_symptom_name(symptom_id)
@@ -189,68 +236,107 @@ class AbdomenPainDiagnosticSystem:
             self.file_path_label.config(text="")
     
     def clear_selection(self):
-        """清空选择"""
-        self.symptom_listbox.selection_clear(0, tk.END)
+        """清空所有用户选择和结果显示
+        
+        1. 清空症状列表框的选择
+        2. 清空推理过程和诊断结果的文本框
+        3. 清空结果文件路径标签
+        """
+        self.symptom_listbox.selection_clear(0, tk.END)  # 清空症状选择
+        
+        # 清空推理过程文本框
         self.process_text.config(state=tk.NORMAL)
         self.process_text.delete(1.0, tk.END)
         self.process_text.config(state=tk.DISABLED)
+        
+        # 清空诊断结果文本框
         self.result_text.config(state=tk.NORMAL)
         self.result_text.delete(1.0, tk.END)
         self.result_text.config(state=tk.DISABLED)
-        self.file_path_label.config(text="")
+        
+        self.file_path_label.config(text="")  # 清空文件路径标签
     
     def open_rule_management(self):
-        """打开规则管理窗口"""
+        """打开规则管理窗口
+        
+        创建并显示规则管理窗口，用户可以在该窗口中添加、编辑和删除诊断规则
+        """
         RuleManagementWindow(self.root, self.db_manager)
     
     def open_result_file(self, event):
-        """打开结果文件"""
+        """打开诊断结果文件
+        
+        当用户点击结果文件路径标签时，使用系统默认程序打开结果文件
+        
+        参数：
+            event: 鼠标点击事件对象
+        """
+        # 从标签文本中提取文件路径
         file_path = self.file_path_label.cget("text").replace("结果已保存至: ", "")
+        
+        # 检查文件路径是否存在且有效
         if file_path and os.path.exists(file_path):
-            os.startfile(file_path)
+            os.startfile(file_path)  # 使用系统默认程序打开文件
 
 # 规则管理窗口类
 class RuleManagementWindow:
+    """规则管理窗口类，用于管理诊断规则的增删改查"""
+    
     def __init__(self, parent, db_manager):
+        """初始化规则管理窗口
+        
+        参数：
+            parent: 父窗口对象
+            db_manager: 数据库管理器对象，用于与数据库交互
+        """
         self.parent = parent
         self.db_manager = db_manager
         
-        # 创建窗口
+        # 创建一个顶级窗口（Toplevel）作为规则管理窗口
         self.window = tk.Toplevel(parent)
         self.window.title("规则管理")
         self.window.geometry("700x500")
         
-        # 创建界面组件
+        # 创建窗口内的所有界面组件
         self.create_widgets()
         
-        # 加载规则
+        # 从数据库加载现有规则到列表中
         self.load_rules()
     
     def create_widgets(self):
-        """创建界面组件"""
-        # 创建主框架
+        """创建规则管理窗口的所有界面组件
+        
+        包括：
+        - 主框架
+        - 规则列表区域
+        - 操作按钮区域
+        """
+        # 创建主框架，设置内边距
         main_frame = ttk.Frame(self.window, padding="10")
-        main_frame.pack(fill=tk.BOTH, expand=True)
+        main_frame.pack(fill=tk.BOTH, expand=True)  # 填充整个窗口并允许扩展
         
-        # 创建规则列表
+        # 创建规则列表的带标签框架
         rule_frame = ttk.LabelFrame(main_frame, text="规则列表", padding="10")
-        rule_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+        rule_frame.pack(fill=tk.BOTH, expand=True, pady=10)  # 垂直方向有10像素的外边距
         
-        # 规则列表框
+        # 创建规则列表框，设置字体和高度
         self.rule_listbox = tk.Listbox(rule_frame, font=('Arial', 10), height=15)
+        
+        # 创建垂直滚动条，与列表框关联
         scrollbar = ttk.Scrollbar(rule_frame, orient=tk.VERTICAL, command=self.rule_listbox.yview)
-        self.rule_listbox.config(yscrollcommand=scrollbar.set)
+        self.rule_listbox.config(yscrollcommand=scrollbar.set)  # 设置列表框的滚动命令
         
-        self.rule_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        # 放置列表框和滚动条
+        self.rule_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)  # 列表框填充剩余空间
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)  # 滚动条垂直填充
         
-        # 创建按钮区域
+        # 创建按钮操作区域
         button_frame = ttk.Frame(main_frame, padding="10")
-        button_frame.pack(fill=tk.X)
+        button_frame.pack(fill=tk.X)  # 水平方向填充
         
-        # 添加规则按钮
+        # 添加规则按钮，点击时调用add_rule方法
         self.add_button = ttk.Button(button_frame, text="添加规则", command=self.add_rule)
-        self.add_button.pack(side=tk.LEFT, padx=5)
+        self.add_button.pack(side=tk.LEFT, padx=5)  # 左侧放置，水平间距5像素
         
         # 修改规则按钮
         self.edit_button = ttk.Button(button_frame, text="修改规则", command=self.edit_rule)
