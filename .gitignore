@@ -15,9 +15,11 @@ env/
 
 # === 本地数据库文件 ===
 rules.db
+abdomen_pain.db
 
 # === 临时或输出文件 ===
 result.txt
+result.out
 *.log
 *.tmp
 
